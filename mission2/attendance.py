@@ -1,95 +1,80 @@
-id1 = {}
-id_cnt = 0
+from typing import Dict
+from strategy import PointBridge, NormalPointBridge
 
-# dat[사용자ID][요일]
-dat = [[0] * 100 for _ in range(100)]
-points = [0] * 100
-grade = [0] * 100
-names = [''] * 100
-wed = [0] * 100
-weeken = [0] * 100
+days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
-def input2(w, wk):
-    global id_cnt
 
-    if w not in id1:
-        id_cnt += 1
-        id1[w] = id_cnt
-        names[id_cnt] = w
+class Player:
+    count = 0
 
-    id2 = id1[w]
+    def __init__(self, name: str, p_bridge: PointBridge):
+        self._id = ++Player.count
+        self._name = name
+        self._point = 0
+        self._day_count = [0] * 7
+        self.p_bridge = p_bridge
 
-    add_point = 0
-    index = 0
+    @property
+    def id_num(self):
+        return self._id
 
-    if wk == "monday":
-        index = 0
-        add_point += 1
-    elif wk == "tuesday":
-        index = 1
-        add_point += 1
-    elif wk == "wednesday":
-        index = 2
-        add_point += 3
-        wed[id2] += 1
-    elif wk == "thursday":
-        index = 3
-        add_point += 1
-    elif wk == "friday":
-        index = 4
-        add_point += 1
-    elif wk == "saturday":
-        index = 5
-        add_point += 2
-        weeken[id2] += 1
-    elif wk == "sunday":
-        index = 6
-        add_point += 2
-        weeken[id2] += 1
+    @property
+    def name(self):
+        return self._name
 
-    dat[id2][index] += 1
-    points[id2] += add_point
+    @property
+    def point(self):
+        return self.p_bridge.calculate_point(self._point, self._day_count)
 
-def input_file():
+    def attend(self, day):
+        day_index = days.index(day)
+        self._day_count[day_index] += 1
+        self._point += self.p_bridge.get_day_point(day_index)
+
+    @property
+    def grade(self):
+        return self.p_bridge.calculate_grade(self._point)
+
+    def removable(self):
+        return self.p_bridge.is_removable(self._point, self._day_count)
+
+
+class BaseballTraining:
+    def __init__(self, p_strategy: PointBridge):
+        self.players : Dict[str, Player] = {}
+        self.p_strategy = p_strategy
+
+    def process_record(self, name:str, day:str):
+        if name not in self.players:
+            self.players[name] = Player(name, self.p_strategy)
+        player = self.players[name]
+        player.attend(day)
+
+
+def input_file(file_path, training: BaseballTraining):
     try:
-        with open("attendance_weekday_500.txt", encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             for _ in range(500):
                 line = f.readline()
                 if not line:
                     break
-                parts = line.strip().split()
-                if len(parts) == 2:
-                    input2(parts[0], parts[1])
+                record = line.strip().split()
+                if len(record) == 2:
+                    training.process_record(name=record[0], day=record[1])
 
-        for i in range(1, id_cnt + 1):
-            if dat[i][2] > 9:
-                points[i] += 10
-            if dat[i][5] + dat[i][6] > 9:
-                points[i] += 10
-
-            if points[i] >= 50:
-                grade[i] = 1
-            elif points[i] >= 30:
-                grade[i] = 2
-            else:
-                grade[i] = 0
-
-            print(f"NAME : {names[i]}, POINT : {points[i]}, GRADE : ", end="")
-            if grade[i] == 1:
-                print("GOLD")
-            elif grade[i] == 2:
-                print("SILVER")
-            else:
-                print("NORMAL")
+        for player in training.players.values():
+            print(f"NAME : {player.name}, POINT : {player.point}, GRADE : ", end="")
+            print(player.grade)
 
         print("\nRemoved player")
         print("==============")
-        for i in range(1, id_cnt + 1):
-            if grade[i] not in (1, 2) and wed[i] == 0 and weeken[i] == 0:
-                print(names[i])
+        for player in training.players.values():
+            if player.removable():
+                print(player.name)
 
     except FileNotFoundError:
         print("파일을 찾을 수 없습니다.")
 
 if __name__ == "__main__":
-    input_file()
+    b_training = BaseballTraining(NormalPointBridge())
+    input_file("attendance_weekday_500.txt", b_training)
